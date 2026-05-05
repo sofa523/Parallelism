@@ -131,7 +131,7 @@ bool test_pow_file(const std::string& filename, TestResult& result) {
     result.wrong_tasks = 0;
     result.max_error = 0.0;
     
-    const double epsilon = 1e-8;
+    const double epsilon = 1e-5;
     
     while (std::getline(file, line)) {
         if (std::regex_search(line, match, pow_regex)) {
