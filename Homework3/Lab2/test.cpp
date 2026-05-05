@@ -130,11 +130,11 @@ bool test_pow_file(const std::string& filename, TestResult& result) {
     result.wrong_tasks = 0;
     result.max_error = 0.0;
     
-    const double eps_small = 1e-8; 
-    const double eps_large = 1e-5; 
+    const double rel_epsilon = 1e-10;    // Относительная погрешность 1e-10
+    const double abs_epsilon = 1e-12;    // Абсолютная погрешность для очень малых чисел
     
     int displayed_errors = 0;
-    const int MAX_DISPLAY = 20;
+    const int MAX_DISPLAY = 30;
     
     while (std::getline(file, line)) {
         if (std::regex_search(line, match, pow_regex)) {
@@ -144,36 +144,14 @@ bool test_pow_file(const std::string& filename, TestResult& result) {
             double computed = std::stod(match[4]);
             double expected = std::pow(base, exp);
             
+            // Вычисляем абсолютную и относительную погрешность
             double abs_error = std::abs(computed - expected);
             double rel_error = abs_error / (std::abs(expected) + 1e-300);
             
             if (rel_error > result.max_error) result.max_error = rel_error;
             
-            // Адаптивный порог в зависимости от величины результата
-            double threshold;
-            double expected_abs = std::abs(expected);
-            
-            if (expected_abs < 1e-50) {
-                // Очень маленькие числа - используем абсолютную погрешность
-                threshold = (abs_error < 1e-40) ? 0 : 1;
-            } else if (expected_abs < 1e10) {
-                // Нормальные числа
-                threshold = (rel_error < 1e-10) ? 0 : 1;
-            } else if (expected_abs < 1e50) {
-                // Большие числа
-                threshold = (rel_error < 1e-9) ? 0 : 1;
-            } else if (expected_abs < 1e100) {
-                // Очень большие числа
-                threshold = (rel_error < 1e-8) ? 0 : 1;
-            } else if (expected_abs < 1e200) {
-                // Экстремально большие числа
-                threshold = (rel_error < 1e-7) ? 0 : 1;
-            } else {
-                // Гигантские числа (e+200 и больше)
-                threshold = (rel_error < 1e-6) ? 0 : 1;
-            }
-            
-            if (threshold == 0) {
+            // Проверка: либо относительная погрешность мала, либо абсолютная (для очень малых чисел)
+            if (rel_error < rel_epsilon || abs_error < abs_epsilon) {
                 result.correct_tasks++;
             } else {
                 result.wrong_tasks++;
@@ -181,8 +159,7 @@ bool test_pow_file(const std::string& filename, TestResult& result) {
                     std::cout << "  Error in pow(" << base << ", " << exp 
                              << "): computed=" << computed 
                              << ", expected=" << expected 
-                             << ", rel_error=" << rel_error
-                             << " (magnitude: " << std::log10(expected_abs) << ")" << std::endl;
+                             << ", rel_error=" << rel_error << std::endl;
                     displayed_errors++;
                 }
             }
@@ -193,19 +170,19 @@ bool test_pow_file(const std::string& filename, TestResult& result) {
         result.avg_error = result.max_error / result.total_tasks;
     }
     
-    std::cout << "    Relative error threshold: adaptive (1e-6 to 1e-10)\n";
-    std::cout << "    Wrong tasks: " << result.wrong_tasks;
     if (result.wrong_tasks > MAX_DISPLAY) {
-        std::cout << " (" << (result.wrong_tasks - MAX_DISPLAY) << " more not shown)";
+        std::cout << "    ... and " << (result.wrong_tasks - MAX_DISPLAY) << " more errors\n";
     }
-    std::cout << std::endl;
     
+    // Считаем тест пройденным, если правильных задач больше 99.9%
+    // Для pow это нормально из-за погрешностей плавающей точки
     double pass_rate = (result.correct_tasks * 100.0) / result.total_tasks;
-    return pass_rate >= 99;
+    return pass_rate >= 99.9;
 }
 
 int main() {
     std::cout << "Testing Client-Server Application\n";
+    std::cout << "================================\n\n";
     
     fs::create_directories("results");
     
@@ -236,12 +213,24 @@ int main() {
             std::cout << "    Total tasks: " << result.total_tasks << "\n";
             std::cout << "    Correct: " << result.correct_tasks << "\n";
             std::cout << "    Wrong: " << result.wrong_tasks << "\n";
+            if (result.wrong_tasks > 0) {
+                std::cout << "    Max relative error: " << result.max_error << "\n";
+            }
+            std::cout << "\n";
         } else {
+            std::cout << "FAILED (file not found)\n\n";
             total++;
         }
     }
     
+    std::cout << "================================\n";
     std::cout << "Test Summary: " << passed << "/" << total << " passed\n";
     
-    return (passed == total) ? 0 : 1;
+    if (passed == total) {
+        std::cout << "All tests passed successfully!\n";
+        return 0;
+    } else {
+        std::cout << "Some tests failed.\n";
+        return 1;
+    }
 }
