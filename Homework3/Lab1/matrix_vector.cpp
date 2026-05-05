@@ -50,7 +50,7 @@ void matrix_vector_product_parallel(double* a, double* b, double* c, int m, int 
 
 int main() {
     int sizes[] = {20000, 40000};
-    int threads[] = {1, 2, 4, 6, 8};
+    int threads[] = {1, 2, 4, 7, 8, 16, 20, 40};
 
     for (int m : sizes) {
         printf("\n=== Matrix size: %d x %d ===\n", m, m);
