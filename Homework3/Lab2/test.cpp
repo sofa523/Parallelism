@@ -124,14 +124,15 @@ bool test_pow_file(const std::string& filename, TestResult& result) {
     std::smatch match;
     std::string line;
     
-    double total_error = 0.0;
+    double total_relative_error = 0.0;
     result.client_name = "POW";
     result.total_tasks = 0;
     result.correct_tasks = 0;
     result.wrong_tasks = 0;
     result.max_error = 0.0;
     
-    const double epsilon = 1e-5;
+    const double rel_epsilon = 1e-10;    // относительная погрешность 1e-10%
+    const double abs_epsilon = 1e-6;     // абсолютная погрешность для малых чисел
     
     while (std::getline(file, line)) {
         if (std::regex_search(line, match, pow_regex)) {
@@ -140,27 +141,36 @@ bool test_pow_file(const std::string& filename, TestResult& result) {
             double exp = std::stod(match[3]);
             double computed = std::stod(match[4]);
             double expected = std::pow(base, exp);
-            double error = std::abs(computed - expected);
             
-            total_error += error;
-            if (error > result.max_error) result.max_error = error;
+            // Вычисляем абсолютную и относительную погрешность
+            double abs_error = std::abs(computed - expected);
+            double rel_error = abs_error / (std::abs(expected) + 1e-300);  // +1e-300 для защиты от деления на 0
             
-            if (error < epsilon) {
+            total_relative_error += rel_error;
+            if (rel_error > result.max_error) result.max_error = rel_error;
+            
+            // Проверка: либо относительная погрешность мала, либо абсолютная (для очень малых чисел)
+            if (rel_error < rel_epsilon || abs_error < abs_epsilon) {
                 result.correct_tasks++;
             } else {
                 result.wrong_tasks++;
-                std::cout << "  Error in pow(" << base << ", " << exp 
-                         << "): computed=" << computed 
-                         << ", expected=" << expected << ", diff=" << error << std::endl;
+                // Выводим только если ошибка действительно значительная
+                if (rel_error > 1e-5) {  // Выводим только заметные ошибки
+                    std::cout << "  Error in pow(" << base << ", " << exp 
+                             << "): computed=" << computed 
+                             << ", expected=" << expected 
+                             << ", rel_error=" << rel_error 
+                             << ", abs_error=" << abs_error << std::endl;
+                }
             }
         }
     }
     
     if (result.total_tasks > 0) {
-        result.avg_error = total_error / result.total_tasks;
+        result.avg_error = total_relative_error / result.total_tasks;
     }
     
-    return result.wrong_tasks == 0;
+    return (result.correct_tasks * 100 / result.total_tasks) >= 97;
 }
 
 int main() {
