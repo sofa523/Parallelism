@@ -51,15 +51,15 @@ private:
     std::condition_variable cond_var;
     std::mutex mut;
     std::unordered_map<size_t, std::future<T>> futures;
-    std::vector<std::thread> workers;  // используем std::thread вместо std::jthread для совместимости
+    std::vector<std::thread> workers;
     std::atomic<bool> running{false};
     std::atomic<bool> stop_flag{false};
     
     void process_tasks() {
-        while (running || !stop_flag) {
+        while (running || !stop_flag) { // пока сервер работает
             std::unique_lock<std::mutex> lock(mut);
             
-            cond_var.wait(lock, [this] { 
+            cond_var.wait(lock, [this] {  // ждем
                 return !tasks.empty() || !running || stop_flag; 
             });
             
@@ -71,11 +71,9 @@ private:
                 // Берем задачу из очереди
                 Task task = std::move(tasks.front());
                 tasks.pop();
-                
-                // Сохраняем promise и future
                 std::promise<T> promise = std::move(task.promise);
                 
-                lock.unlock();
+                lock.unlock();  // освобождаем мьютекс
                 
                 try {
                     // Выполняем задачу
@@ -83,7 +81,6 @@ private:
                     // Устанавливаем результат
                     promise.set_value(result);
                 } catch (...) {
-                    // В случае ошибки устанавливаем исключение
                     promise.set_exception(std::current_exception());
                 }
                 
@@ -160,7 +157,7 @@ public:
         
         {
             std::lock_guard<std::mutex> lock(mut);
-            tasks.emplace(id, std::move(task));
+            tasks.emplace(id, std::move(task));  // добавляем в очередь
             tasks.back().promise = std::move(promise);
             futures[id] = std::move(future);
         }
@@ -232,4 +229,4 @@ public:
     }
 };
 
-#endif // SERVER_H
+#endif
